@@ -8,6 +8,8 @@
     <link href="css/reset.css" type="text/css" rel="stylesheet" />
 
     <script src="js/jquery-3.1.1.min.js"></script>
+	<script src="js/numeric-1.2.6.min.js"></script>
+	<script src="js/Transformations.js"></script>
 
     <!-- Vertex shader -->
     <script id="shader-vs" type="x-shader/x-vertex"><%@include file="shaders/vertex.glsl" %></script>
@@ -20,6 +22,14 @@
 		var /** type {Element} */ canvas;
         var shaderProgram;
         var triangleVertexBuffer;
+
+		// Camera controls.
+		var gPointOfInterest = [0,0,0];
+		var gEye = [0,0,10];
+		var gUp = Tf.Y_AXIS;
+
+		// Projection matrix.
+		var Proj = null;
 
         /**
          * Create a WebGL context.
@@ -180,16 +190,29 @@
             triangleVertexBuffer.numberOfItems = 3;
         }
 
+        function sendShadingInformation( Projection, Camera, Model )
+		{
+			var ModelView = numeric.dot( Camera, Model );		// Model-view transformation matrix.
+
+			// Send the ModelView and Projection matrices.
+			var mvLocation = gl.getUniformLocation( shaderProgram, "ModelView" );
+			var projLocation = gl.getUniformLocation( shaderProgram, "Projection" );
+
+			gl.uniformMatrix4fv( mvLocation, false, Tf.toWebGLMatrix( ModelView ) );
+			gl.uniformMatrix4fv( projLocation, false, Tf.toWebGLMatrix( Projection ));
+		}
+
         /**
          * Draw objects.
          */
         function draw()
         {
             gl.viewport( 0, 0, gl.viewportWidth, gl.viewportHeight );
+			gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
             gl.clear( gl.COLOR_BUFFER_BIT );
 
-			// Use compiled shader program.
-			gl.useProgram( shaderProgram );
+			// Set up the view matrix.
+			var Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
 
             // Bind the buffer containing both position and color.
             gl.bindBuffer( gl.ARRAY_BUFFER, triangleVertexBuffer );
@@ -203,6 +226,9 @@
             // Enable vertex attrib arryas for both position and color attributes.
             gl.enableVertexAttribArray( shaderProgram.vertexPositionAttribute );
             gl.enableVertexAttribArray( shaderProgram.vertexColorAttribute );
+
+			// Apply transformations.
+			sendShadingInformation( Proj, Camera, numeric.dot(Tf.rotate( Math.PI/4, Tf.Z_AXIS ), Tf.translate(3,0,0)) );
 
             // Draw triangle.
             gl.drawArrays( gl.TRIANGLES, 0, triangleVertexBuffer.numberOfItems );
@@ -219,6 +245,10 @@
         $(window).resize( function(){
             canvas.width = $(window).width();
 			canvas.height = $(window).height();
+			var ratio = canvas.width/canvas.height;
+			console.log( canvas.width, canvas.height, ratio );
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+			//Proj = Tf.ortographic( -5, 5, -5, 5, 0.01, 100.0 );
 			draw();
         });
 
@@ -228,12 +258,19 @@
         function startup()
         {
             canvas = $( "#myGLCanvas" )[0];                // Access element and set the height and width.
-            canvas.width = $(window).width();
+			canvas.width = $(window).width();
             canvas.height = $(window).height();
-            gl = createGLContext( canvas );
+
+			var ratio = canvas.width/canvas.height;
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+			//Proj = Tf.ortographic( -5, 5, -5, 5, 0.01, 100.0 );
+
+			gl = createGLContext( canvas );
             setupShaders();
             setupBuffers();
-            gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
+
+			// Use compiled shader program.
+			gl.useProgram( shaderProgram );
             draw();
         }
     </script>

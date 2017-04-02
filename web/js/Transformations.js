@@ -9,7 +9,7 @@ var Tf = {
 	 * @param x {number} Displacement along x axis.
 	 * @param y {number} Displacement along y axis.
 	 * @param z {number} Displacement along z axis.
-	 * @returns {number[]} A 4x4 translation matrix.
+	 * @returns {Array.<Array.<number>>} A 4x4 translation matrix.
 	 */
 	translate: function( x, y, z ){
 		return [
@@ -23,7 +23,7 @@ var Tf = {
 	/**
 	 * Translation with vector displacement.
 	 * @param d {number[]} Displacement vector
-	 * @returns {number[]}
+	 * @returns {Array.<Array.<number>>}
 	 */
 	translateV: function( d ){
 		return Tf.translate( d[0], d[1], d[2] );
@@ -34,7 +34,7 @@ var Tf = {
 	 * @param x {number} Scaling along x axis.
 	 * @param y {number} Scaling along y axis.
 	 * @param z {number} Scaling along z axis.
-	 * @returns {number[]} A 4x4 scaling matrix.
+	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
 	 */
 	scale: function( x, y, z ){
 		return [
@@ -48,7 +48,7 @@ var Tf = {
 	/**
 	 * Scaling with factors vector.
 	 * @param s {number[]} Scaling factors vector.
-	 * @returns {*|number[]} A 4x4 scaling matrix.
+	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
 	 */
 	scaleV: function( s ){
 		return Tf.scale( s[0], s[1], s[2] );
@@ -67,7 +67,7 @@ var Tf = {
 	 * Cross product of 2 3-element vectors.
 	 * @param u {number[]} Vector.
 	 * @param v {number[]} Vector.
-	 * @returns {*[]}
+	 * @returns {number[]}
 	 */
 	cross: function( u, v ){
 		return [
@@ -116,9 +116,9 @@ var Tf = {
 	 * @param e {number[]} Viewer's eye position.
 	 * @param p {number[]} Point of interest.
 	 * @param u {number[]} Up vector.
+	 * @returns {Array.<Array.<number>>} The 4x4 view matrix.
 	 */
-	lookAt: function( e, p, u )
-	{
+	lookAt: function( e, p, u ){
 		var z = Tf.normalize( numeric.sub(e, p) ),			// Forward vector.
 			x = Tf.normalize( Tf.cross( u, z ) ),			// Sideways vector.
 			y = Tf.cross( z, x );							// Normalized up vector.
@@ -141,10 +141,9 @@ var Tf = {
 	 * @param top {number} Top plane.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
-	 * @returns {number[]} A 4x4 perspective matrix.
+	 * @returns {Array.<Array.<number>>} A 4x4 perspective matrix.
  	 */
-	frustrum: function( left, right, bottom, top, near, far )
-	{
+	frustrum: function( left, right, bottom, top, near, far ){
 		if( right == left || top == bottom || near == far || near < 0.0 || far < 0.0 )
 			return numeric.identity( 4 );
 
@@ -162,10 +161,9 @@ var Tf = {
 	 * @param ratio {number} Viewport ratio.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
-	 * @returns {number[]} A 4x4 perspective matrix.
+	 * @returns {Array.<Array.<number>>} A 4x4 perspective matrix.
 	 */
-	perspective: function( fovy, ratio, near, far )
-	{
+	perspective: function( fovy, ratio, near, far ){
 		var q = 1.0/( fovy/2.0 ),
 			a = q / ratio,
 			b = far/(near-far),
@@ -177,6 +175,71 @@ var Tf = {
 			[ 0.0,  0.0,    b,    c ],
 			[ 0.0,  0.0, -1.0,  0.0 ]
 		];
+	},
+
+	/**
+	 * Ortographic projection matrix.
+	 * @param left {number} Left plane.
+	 * @param right {number} Right plane.
+	 * @param bottom {number} Bottom plane.
+	 * @param top {number} Top plane.
+	 * @param near {number} Near plane.
+	 * @param far {number} Far plane.
+	 * @returns {Array<Array<number>>}
+	 */
+	ortographic: function( left, right, bottom, top, near, far ){
+		if( right == left || top == bottom || near == far || near < 0.0 || far < 0.0 )
+			return numeric.identity( 4 );
+
+		return [
+			[ 2.0/(right-left),              0.0,             0.0, -(left+right)/(right-left) ],
+			[              0.0, 2.0/(top-bottom),             0.0, -(bottom+top)/(top-bottom) ],
+			[              0.0,              0.0, -2.0/(far-near),     -(far+near)/(far-near) ],
+			[              0.0,              0.0,             0.0,                        1.0 ]
+		];
+	},
+
+
+	/**
+	 * Transform a common matrix into a column-major array of doubles, suitable for WebGL shaders.
+	 * @param source {Array.<Array.<number>>}
+	 * @returns {Float32Array}
+	 */
+	toWebGLMatrix: function( source ){
+		var rows = source.length;
+		var cols = source[0].length || 1;
+
+		var destination = new Float32Array(rows * cols);
+
+		for( var c = 0; c < cols; c++ )
+			for( var r = 0; r < rows; r++ )
+				destination[c*rows + r] = source[r][c];
+
+		return destination;
 	}
 
 };
+
+/**
+ * The coordinate axes.
+ */
+Object.defineProperty( Tf, "X_AXIS", {
+	get: function () {
+		return [1, 0, 0];
+	}
+});
+
+Object.defineProperty( Tf, "Y_AXIS", {
+	get: function () {
+		return [0, 1, 0];
+	}
+});
+
+Object.defineProperty( Tf, "Z_AXIS", {
+	get: function () {
+		return [0, 0, 1];
+	}
+});
+
+
+
