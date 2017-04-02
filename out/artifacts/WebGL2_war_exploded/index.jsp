@@ -8,6 +8,8 @@
     <link href="css/reset.css" type="text/css" rel="stylesheet" />
 
     <script src="js/jquery-3.1.1.min.js"></script>
+	<script src="js/numeric-1.2.6.min.js"></script>
+	<script src="js/Transformations.js"></script>
 
     <!-- Vertex shader -->
     <script id="shader-vs" type="x-shader/x-vertex"><%@include file="shaders/vertex.glsl" %></script>
@@ -16,10 +18,76 @@
     <script id="shader-fs" type="x-shader/x-fragment"><%@include file="shaders/fragment.glsl" %></script>
 
     <script>
-        var /** type {context} */ gl;
+		var /** type {context} */ gl;
 		var /** type {Element} */ canvas;
-        var shaderProgram;
-        var triangleVertexBuffer;
+		var shaderProgram;
+		var triangleVertexBuffer;
+
+		// Time control.
+		var gTime = 0.0;
+		var gDeltaT = 0.01;
+
+		// Camera controls.
+		var gPointOfInterest = [0,0,0];
+		var gEye = [0,0,10];
+		var gUp = Tf.Y_AXIS;
+
+		// Projection and Camera matrices.
+		var Proj = null;
+		var Camera = null;
+
+		/////////////////////////////////////// User interaction interface /////////////////////////////////////////////
+
+		var ArcBall = numeric.identity(4);		// Rotation, simple arc ball matrix.
+		var gMouseDown = false;
+		var gLastMouseX = null;
+		var gLastMouseY = null;
+
+		/**
+		 * When user clicks on canvas.
+		 * @param event {Event} jQuery on mouse down event.
+		 */
+		function canvasMouseDown( event )
+		{
+			gMouseDown = true;
+			gLastMouseX = event.clientX;
+			gLastMouseY = event.clientY;
+
+			console.log("clicked", gLastMouseX, gLastMouseY);
+		}
+
+		/**
+		 * When user releases mouse.
+		 */
+		function documentMouseUp()
+		{
+			gMouseDown = false;
+		}
+
+		/**
+		 * When user drags mouse within the canvas.
+		 * @param event {Event} jQuery event object.
+		 */
+		function canvasMouseMove( event )
+		{
+			if( !gMouseDown )
+				return false;
+
+			var newX = event.clientX,		// New mouse position.
+				newY = event.clientY;
+
+			// The changes in the X and Y direction.
+			var deltaX = newX - gLastMouseX,
+				deltaY = newY - gLastMouseY;
+
+			var R = numeric.dot( Tf.rotate( Tf.degreesToRadians(deltaY), [1,0,0] ), Tf.rotate( Tf.degreesToRadians(deltaX), [0,1,0] ) );
+			ArcBall = numeric.dot( ArcBall, R );
+
+			gLastMouseX = newX;
+			gLastMouseY = newY;
+		}
+
+		/////////////////////////////////////////////// WebGL functions ////////////////////////////////////////////////
 
         /**
          * Create a WebGL context.
@@ -180,16 +248,29 @@
             triangleVertexBuffer.numberOfItems = 3;
         }
 
+        function sendShadingInformation( Projection, Camera, Model )
+		{
+			var ModelView = numeric.dot( Camera, Model );		// Model-view transformation matrix.
+
+			// Send the ModelView and Projection matrices.
+			var mvLocation = gl.getUniformLocation( shaderProgram, "ModelView" );
+			var projLocation = gl.getUniformLocation( shaderProgram, "Projection" );
+
+			gl.uniformMatrix4fv( mvLocation, false, Tf.toWebGLMatrix( ModelView ) );
+			gl.uniformMatrix4fv( projLocation, false, Tf.toWebGLMatrix( Projection ));
+		}
+
         /**
          * Draw objects.
          */
         function draw()
         {
             gl.viewport( 0, 0, gl.viewportWidth, gl.viewportHeight );
+			gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
             gl.clear( gl.COLOR_BUFFER_BIT );
 
-			// Use compiled shader program.
-			gl.useProgram( shaderProgram );
+			// Set up the view matrix.
+			Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
 
             // Bind the buffer containing both position and color.
             gl.bindBuffer( gl.ARRAY_BUFFER, triangleVertexBuffer );
@@ -204,6 +285,9 @@
             gl.enableVertexAttribArray( shaderProgram.vertexPositionAttribute );
             gl.enableVertexAttribArray( shaderProgram.vertexColorAttribute );
 
+			// Apply transformations.
+			sendShadingInformation( Proj, Camera, numeric.dot( ArcBall , Tf.translate(3,0,0) ) );
+
             // Draw triangle.
             gl.drawArrays( gl.TRIANGLES, 0, triangleVertexBuffer.numberOfItems );
 
@@ -211,6 +295,8 @@
 			gl.disableVertexAttribArray( shaderProgram.vertexPositionAttribute );
 			gl.disableVertexAttribArray( shaderProgram.vertexColorAttribute );
 
+			// Time control.
+			gTime += gDeltaT;
         }
 
         /**
@@ -219,7 +305,8 @@
         $(window).resize( function(){
             canvas.width = $(window).width();
 			canvas.height = $(window).height();
-			draw();
+			var ratio = canvas.width/canvas.height;
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
         });
 
         /**
@@ -227,15 +314,38 @@
          */
         function startup()
         {
-            canvas = $( "#myGLCanvas" )[0];                // Access element and set the height and width.
-            canvas.width = $(window).width();
+        	var jCanvas = $( "#myGLCanvas" );
+            canvas = jCanvas[0];                // Access element and set the height and width.
+			canvas.width = $(window).width();
             canvas.height = $(window).height();
-            gl = createGLContext( canvas );
+
+			// Set up event handlers.
+			jCanvas.on( "mousedown", canvasMouseDown );
+			jCanvas.on( "mousemove", canvasMouseMove );
+			document.onmouseup = documentMouseUp;
+
+			var ratio = canvas.width/canvas.height;
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+
+			gl = createGLContext( canvas );
             setupShaders();
             setupBuffers();
-            gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
-            draw();
+
+			// Use compiled shader program.
+			gl.useProgram( shaderProgram );
+
+			// Run animation.
+			tick();
         }
+
+		/**
+		 * Time passing function.
+		 */
+		function tick()
+		{
+			requestAnimationFrame( tick );
+			draw();
+		}
     </script>
 
 </head>

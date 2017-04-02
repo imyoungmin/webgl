@@ -216,6 +216,10 @@ var Tf = {
 				destination[c*rows + r] = source[r][c];
 
 		return destination;
+	},
+
+	degreesToRadians: function( degrees ){
+		return degrees * (2*Math.PI)/360;
 	}
 
 };

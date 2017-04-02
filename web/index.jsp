@@ -18,18 +18,76 @@
     <script id="shader-fs" type="x-shader/x-fragment"><%@include file="shaders/fragment.glsl" %></script>
 
     <script>
-        var /** type {context} */ gl;
+		var /** type {context} */ gl;
 		var /** type {Element} */ canvas;
-        var shaderProgram;
-        var triangleVertexBuffer;
+		var shaderProgram;
+		var triangleVertexBuffer;
+
+		// Time control.
+		var gTime = 0.0;
+		var gDeltaT = 0.01;
 
 		// Camera controls.
 		var gPointOfInterest = [0,0,0];
 		var gEye = [0,0,10];
 		var gUp = Tf.Y_AXIS;
 
-		// Projection matrix.
+		// Projection and Camera matrices.
 		var Proj = null;
+		var Camera = null;
+
+		/////////////////////////////////////// User interaction interface /////////////////////////////////////////////
+
+		var ArcBall = numeric.identity(4);		// Rotation, simple arc ball matrix.
+		var gMouseDown = false;
+		var gLastMouseX = null;
+		var gLastMouseY = null;
+
+		/**
+		 * When user clicks on canvas.
+		 * @param event {Event} jQuery on mouse down event.
+		 */
+		function canvasMouseDown( event )
+		{
+			gMouseDown = true;
+			gLastMouseX = event.clientX;
+			gLastMouseY = event.clientY;
+
+			console.log("clicked", gLastMouseX, gLastMouseY);
+		}
+
+		/**
+		 * When user releases mouse.
+		 */
+		function documentMouseUp()
+		{
+			gMouseDown = false;
+		}
+
+		/**
+		 * When user drags mouse within the canvas.
+		 * @param event {Event} jQuery event object.
+		 */
+		function canvasMouseMove( event )
+		{
+			if( !gMouseDown )
+				return false;
+
+			var newX = event.clientX,		// New mouse position.
+				newY = event.clientY;
+
+			// The changes in the X and Y direction.
+			var deltaX = newX - gLastMouseX,
+				deltaY = newY - gLastMouseY;
+
+			var R = numeric.dot( Tf.rotate( Tf.degreesToRadians(deltaY), [1,0,0] ), Tf.rotate( Tf.degreesToRadians(deltaX), [0,1,0] ) );
+			ArcBall = numeric.dot( ArcBall, R );
+
+			gLastMouseX = newX;
+			gLastMouseY = newY;
+		}
+
+		/////////////////////////////////////////////// WebGL functions ////////////////////////////////////////////////
 
         /**
          * Create a WebGL context.
@@ -212,7 +270,7 @@
             gl.clear( gl.COLOR_BUFFER_BIT );
 
 			// Set up the view matrix.
-			var Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
+			Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
 
             // Bind the buffer containing both position and color.
             gl.bindBuffer( gl.ARRAY_BUFFER, triangleVertexBuffer );
@@ -228,7 +286,7 @@
             gl.enableVertexAttribArray( shaderProgram.vertexColorAttribute );
 
 			// Apply transformations.
-			sendShadingInformation( Proj, Camera, numeric.dot(Tf.rotate( Math.PI/4, Tf.Z_AXIS ), Tf.translate(3,0,0)) );
+			sendShadingInformation( Proj, Camera, numeric.dot( ArcBall , Tf.translate(3,0,0) ) );
 
             // Draw triangle.
             gl.drawArrays( gl.TRIANGLES, 0, triangleVertexBuffer.numberOfItems );
@@ -237,6 +295,8 @@
 			gl.disableVertexAttribArray( shaderProgram.vertexPositionAttribute );
 			gl.disableVertexAttribArray( shaderProgram.vertexColorAttribute );
 
+			// Time control.
+			gTime += gDeltaT;
         }
 
         /**
@@ -246,10 +306,7 @@
             canvas.width = $(window).width();
 			canvas.height = $(window).height();
 			var ratio = canvas.width/canvas.height;
-			console.log( canvas.width, canvas.height, ratio );
 			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
-			//Proj = Tf.ortographic( -5, 5, -5, 5, 0.01, 100.0 );
-			draw();
         });
 
         /**
@@ -257,13 +314,18 @@
          */
         function startup()
         {
-            canvas = $( "#myGLCanvas" )[0];                // Access element and set the height and width.
+        	var jCanvas = $( "#myGLCanvas" );
+            canvas = jCanvas[0];                // Access element and set the height and width.
 			canvas.width = $(window).width();
             canvas.height = $(window).height();
 
+			// Set up event handlers.
+			jCanvas.on( "mousedown", canvasMouseDown );
+			jCanvas.on( "mousemove", canvasMouseMove );
+			document.onmouseup = documentMouseUp;
+
 			var ratio = canvas.width/canvas.height;
 			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
-			//Proj = Tf.ortographic( -5, 5, -5, 5, 0.01, 100.0 );
 
 			gl = createGLContext( canvas );
             setupShaders();
@@ -271,8 +333,19 @@
 
 			// Use compiled shader program.
 			gl.useProgram( shaderProgram );
-            draw();
+
+			// Run animation.
+			tick();
         }
+
+		/**
+		 * Time passing function.
+		 */
+		function tick()
+		{
+			requestAnimationFrame( tick );
+			draw();
+		}
     </script>
 
 </head>
