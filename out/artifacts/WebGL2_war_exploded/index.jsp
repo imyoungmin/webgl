@@ -35,6 +35,7 @@
 		// Projection and Camera matrices.
 		var Proj = null;
 		var Camera = null;
+		var Model = null;
 
 		/////////////////////////////////////// User interaction interface /////////////////////////////////////////////
 
@@ -42,6 +43,10 @@
 		var gMouseDown = false;
 		var gLastMouseX = null;
 		var gLastMouseY = null;
+
+        var gZoom = 1.0;						// Camera zoom.
+        const ZOOM_IN = 1.03;
+        const ZOOM_OUT = 0.97;
 
 		/**
 		 * When user clicks on canvas.
@@ -54,6 +59,8 @@
 			gLastMouseY = event.clientY;
 
 			console.log("clicked", gLastMouseX, gLastMouseY);
+
+			event.preventDefault();
 		}
 
 		/**
@@ -85,6 +92,19 @@
 
 			gLastMouseX = newX;
 			gLastMouseY = newY;
+
+			event.preventDefault();
+		}
+
+		/**
+		 * When user scrolls within the canvas event listener.
+		 * @param event {WheelEvent} DOM level-3 event object.
+		 */
+		function canvasMouseScroll( event )
+		{
+			gZoom *= (event.deltaY > 0)? ZOOM_IN: ZOOM_OUT;
+
+			event.preventDefault();
 		}
 
 		/////////////////////////////////////////////// WebGL functions ////////////////////////////////////////////////
@@ -267,7 +287,7 @@
         {
             gl.viewport( 0, 0, gl.viewportWidth, gl.viewportHeight );
 			gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
-            gl.clear( gl.COLOR_BUFFER_BIT );
+            gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
 
 			// Set up the view matrix.
 			Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
@@ -286,7 +306,8 @@
             gl.enableVertexAttribArray( shaderProgram.vertexColorAttribute );
 
 			// Apply transformations.
-			sendShadingInformation( Proj, Camera, numeric.dot( ArcBall , Tf.translate(3,0,0) ) );
+			Model = numeric.dot( ArcBall, Tf.scaleU( gZoom ) );
+			sendShadingInformation( Proj, Camera, Model );
 
             // Draw triangle.
             gl.drawArrays( gl.TRIANGLES, 0, triangleVertexBuffer.numberOfItems );
@@ -306,7 +327,7 @@
             canvas.width = $(window).width();
 			canvas.height = $(window).height();
 			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+			Proj = Tf.perspective( Math.PI/9, ratio, 0.01, 1000.0 );
         });
 
         /**
@@ -322,14 +343,19 @@
 			// Set up event handlers.
 			jCanvas.on( "mousedown", canvasMouseDown );
 			jCanvas.on( "mousemove", canvasMouseMove );
+			jCanvas[0].addEventListener( "mousewheel", canvasMouseScroll, false );
 			document.onmouseup = documentMouseUp;
 
 			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+			Proj = Tf.perspective( Math.PI/9, ratio, 0.01, 1000.0 );
 
 			gl = createGLContext( canvas );
             setupShaders();
             setupBuffers();
+
+			// Enable depth test.
+			gl.enable( gl.DEPTH_TEST );
+			gl.depthFunc( gl.LESS );
 
 			// Use compiled shader program.
 			gl.useProgram( shaderProgram );

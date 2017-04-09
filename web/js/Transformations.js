@@ -46,6 +46,15 @@ var Tf = {
 	},
 
 	/**
+	 * Uniform scaling across axes.
+	 * @param s {number} Scaling factor for x, y, and z axes.
+	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
+	 */
+	scaleU: function( s ){
+		return Tf.scale( s, s, s );
+	},
+
+	/**
 	 * Scaling with factors vector.
 	 * @param s {number[]} Scaling factors vector.
 	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
@@ -157,24 +166,15 @@ var Tf = {
 
 	/**
 	 * Perspective matrix: symmetric frustrum.
-	 * @param fovy {number} Aberture.
+	 * @param fovy {number} Field of view.
 	 * @param ratio {number} Viewport ratio.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
 	 * @returns {Array.<Array.<number>>} A 4x4 perspective matrix.
 	 */
 	perspective: function( fovy, ratio, near, far ){
-		var q = 1.0/( fovy/2.0 ),
-			a = q / ratio,
-			b = far/(near-far),
-			c = near*far/(near-far);
-
-		return [
-			[   a,  0.0,  0.0,  0.0 ],
-			[ 0.0,    q,  0.0,  0.0 ],
-			[ 0.0,  0.0,    b,    c ],
-			[ 0.0,  0.0, -1.0,  0.0 ]
-		];
+		var top = Math.tan( fovy/2.0 ) * near;
+		return Tf.frustrum( -top*ratio, top*ratio, -top, top, near, far );
 	},
 
 	/**
