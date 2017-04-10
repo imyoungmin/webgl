@@ -107,6 +107,15 @@
 			event.preventDefault();
 		}
 
+		/**
+		 * When user presses the reset button event listener.
+		 */
+		function resetViewButtonClick()
+		{
+			gZoom = 1.0;
+			ArcBall = numeric.identity(4);
+		}
+
 		/////////////////////////////////////////////// WebGL functions ////////////////////////////////////////////////
 
         /**
@@ -225,7 +234,7 @@
                 //( x     y     z )   (  r    g    b    a )
                    0.0,  0.5,  0.0,     255,   0,   0, 255,     // v0
                   -0.5, -0.5,  0.0,       0, 255,   0, 255,     // v1
-                   0.5, -0.5,  0.5,       0,   0, 255, 255      // v2
+                   0.5, -0.5,  0.0,       0,   0, 255, 255      // v2
             ];
 
             var nbrOfVertices = 3;
@@ -324,10 +333,11 @@
          * Modify the canvas size when window resizes.
          */
         $(window).resize( function(){
-            canvas.width = $(window).width();
-			canvas.height = $(window).height();
+			var jCanvasContainer = $( "#canvasContainer" );
+			canvas.width = jCanvasContainer[0].offsetWidth;
+			canvas.height = jCanvasContainer[0].offsetHeight;
 			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( Math.PI/9, ratio, 0.01, 1000.0 );
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
         });
 
         /**
@@ -336,18 +346,20 @@
         function startup()
         {
         	var jCanvas = $( "#myGLCanvas" );
+			var jCanvasContainer = $( "#canvasContainer" );
             canvas = jCanvas[0];                // Access element and set the height and width.
-			canvas.width = $(window).width();
-            canvas.height = $(window).height();
+			canvas.width = jCanvasContainer[0].offsetWidth;
+            canvas.height = jCanvasContainer[0].offsetHeight;
 
 			// Set up event handlers.
 			jCanvas.on( "mousedown", canvasMouseDown );
 			jCanvas.on( "mousemove", canvasMouseMove );
 			jCanvas[0].addEventListener( "mousewheel", canvasMouseScroll, false );
 			document.onmouseup = documentMouseUp;
+			$("#resetViewButton").click( resetViewButtonClick );
 
 			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( Math.PI/9, ratio, 0.01, 1000.0 );
+			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
 
 			gl = createGLContext( canvas );
             setupShaders();
@@ -376,8 +388,13 @@
 
 </head>
 <body onload="startup();">
-    <canvas id="myGLCanvas" width="500" height="500">
-        Your browser does not support the canvas object.
-    </canvas>
+	<div style="position: absolute; padding: 10px; z-index: 1; top: 10px; left: 10px; background: rgba( 255, 255, 255, 0.25 ); border-radius: 5px;">
+		<button id="resetViewButton">Reset View</button>
+	</div>
+	<div id="canvasContainer" style="position: absolute; top: 0; right: 0; left: 0; bottom: 0; z-index: 0;">
+		<canvas id="myGLCanvas" width="500" height="500">
+			Your browser does not support the canvas object.
+		</canvas>
+	</div>
 </body>
 </html>
