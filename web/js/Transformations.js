@@ -5,11 +5,21 @@
 var Tf = {
 
 	/**
+	 * Vector with three elements.
+	 * @typedef {number[]} Vec3
+	 */
+
+	/**
+	 * A 4x4 matrix.
+	 * @typedef {Array.<number[]>} Mat44
+	 */
+
+	/**
 	 * Translation with individual displacements.
 	 * @param x {number} Displacement along x axis.
 	 * @param y {number} Displacement along y axis.
 	 * @param z {number} Displacement along z axis.
-	 * @returns {Array.<Array.<number>>} A 4x4 translation matrix.
+	 * @returns {number} A 4x4 translation matrix.
 	 */
 	translate: function( x, y, z ){
 		return [
@@ -22,8 +32,8 @@ var Tf = {
 
 	/**
 	 * Translation with vector displacement.
-	 * @param d {number[]} Displacement vector
-	 * @returns {Array.<Array.<number>>}
+	 * @param d {Vec3} Displacement vector
+	 * @returns {Mat44}
 	 */
 	translateV: function( d ){
 		return Tf.translate( d[0], d[1], d[2] );
@@ -34,7 +44,7 @@ var Tf = {
 	 * @param x {number} Scaling along x axis.
 	 * @param y {number} Scaling along y axis.
 	 * @param z {number} Scaling along z axis.
-	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
+	 * @returns {Mat44} A 4x4 scaling matrix.
 	 */
 	scale: function( x, y, z ){
 		return [
@@ -48,7 +58,7 @@ var Tf = {
 	/**
 	 * Uniform scaling across axes.
 	 * @param s {number} Scaling factor for x, y, and z axes.
-	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
+	 * @returns {Mat44} A 4x4 scaling matrix.
 	 */
 	scaleU: function( s ){
 		return Tf.scale( s, s, s );
@@ -56,8 +66,8 @@ var Tf = {
 
 	/**
 	 * Scaling with factors vector.
-	 * @param s {number[]} Scaling factors vector.
-	 * @returns {Array.<Array.<number>>} A 4x4 scaling matrix.
+	 * @param s {Vec3} Scaling factors vector.
+	 * @returns {Mat44} A 4x4 scaling matrix.
 	 */
 	scaleV: function( s ){
 		return Tf.scale( s[0], s[1], s[2] );
@@ -65,7 +75,7 @@ var Tf = {
 
 	/**
 	 * Normalize a vector (not in place).
-	 * @param v {number[]} A 3-element vector.
+	 * @param v {number[]} An n-element vector.
 	 * @returns {number[]} Normalized version of input vector.
 	 */
 	normalize: function( v ){
@@ -74,9 +84,9 @@ var Tf = {
 
 	/**
 	 * Cross product of 2 3-element vectors.
-	 * @param u {number[]} Vector.
-	 * @param v {number[]} Vector.
-	 * @returns {number[]}
+	 * @param u {Vec3} Vector.
+	 * @param v {Vec3} Vector.
+	 * @returns {Vec3}
 	 */
 	cross: function( u, v ){
 		return [
@@ -86,6 +96,12 @@ var Tf = {
 		];
 	},
 
+	/**
+	 * Build a rotation matrix.
+	 * @param theta {number} Rotation angle.
+	 * @param axis {Vec3} Rotation axis.
+	 * @returns {Mat44} A 4x4 rotation matrix.
+	 */
 	rotate: function( theta, axis ){
 		var u = Tf.normalize( axis );		// Normalize rotation axis.
 		var cosTheta = Math.cos( theta );
@@ -122,10 +138,10 @@ var Tf = {
 
 	/**
 	 * Generate the view matrix: look at.
-	 * @param e {number[]} Viewer's eye position.
-	 * @param p {number[]} Point of interest.
-	 * @param u {number[]} Up vector.
-	 * @returns {Array.<Array.<number>>} The 4x4 view matrix.
+	 * @param e {Vec3} Viewer's eye position.
+	 * @param p {Vec3} Point of interest.
+	 * @param u {Vec3} Up vector.
+	 * @returns {Mat44} The 4x4 view matrix.
 	 */
 	lookAt: function( e, p, u ){
 		var z = Tf.normalize( numeric.sub(e, p) ),			// Forward vector.
@@ -150,7 +166,7 @@ var Tf = {
 	 * @param top {number} Top plane.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
-	 * @returns {Array.<Array.<number>>} A 4x4 perspective matrix.
+	 * @returns {Mat44} A 4x4 perspective matrix.
  	 */
 	frustrum: function( left, right, bottom, top, near, far ){
 		if( right == left || top == bottom || near == far || near < 0.0 || far < 0.0 )
@@ -170,7 +186,7 @@ var Tf = {
 	 * @param ratio {number} Viewport ratio.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
-	 * @returns {Array.<Array.<number>>} A 4x4 perspective matrix.
+	 * @returns {Mat44} A 4x4 perspective matrix.
 	 */
 	perspective: function( fovy, ratio, near, far ){
 		var top = Math.tan( fovy/2.0 ) * near;
@@ -185,7 +201,7 @@ var Tf = {
 	 * @param top {number} Top plane.
 	 * @param near {number} Near plane.
 	 * @param far {number} Far plane.
-	 * @returns {Array<Array<number>>}
+	 * @returns {Mat44}
 	 */
 	ortographic: function( left, right, bottom, top, near, far ){
 		if( right == left || top == bottom || near == far || near < 0.0 || far < 0.0 )
@@ -202,7 +218,7 @@ var Tf = {
 
 	/**
 	 * Transform a common matrix into a column-major array of doubles, suitable for WebGL shaders.
-	 * @param source {Array.<Array.<number>>}
+	 * @param source {Mat44}
 	 * @returns {Float32Array}
 	 */
 	toWebGLMatrix: function( source ){
@@ -218,14 +234,19 @@ var Tf = {
 		return destination;
 	},
 
+	/**
+	 * Transform hexadecimal degrees into radians.
+	 * @param degrees {number} Degrees to transform.
+	 * @returns {number} Equivalent radians.
+	 */
 	degreesToRadians: function( degrees ){
-		return degrees * (2*Math.PI)/360;
+		return degrees * (2.0*Math.PI)/360.0;
 	}
 
 };
 
 /**
- * The coordinate axes.
+ * The positive coordinate axes.
  */
 Object.defineProperty( Tf, "X_AXIS", {
 	get: function () {
@@ -242,6 +263,27 @@ Object.defineProperty( Tf, "Y_AXIS", {
 Object.defineProperty( Tf, "Z_AXIS", {
 	get: function () {
 		return [0, 0, 1];
+	}
+});
+
+/**
+ * The negative coordinate axes.
+ */
+Object.defineProperty( Tf, "NEG_X_AXIS", {
+	get: function () {
+		return [-1, 0, 0];
+	}
+});
+
+Object.defineProperty( Tf, "NEG_Y_AXIS", {
+	get: function () {
+		return [0, -1, 0];
+	}
+});
+
+Object.defineProperty( Tf, "NEG_Z_AXIS", {
+	get: function () {
+		return [0, 0, -1];
 	}
 });
 
