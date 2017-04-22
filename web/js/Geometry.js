@@ -91,10 +91,13 @@ function Geometry()
 
 	/**
 	 * Builds a cube centered at the origin.
-	 * @param side {number} Cube side length.
+	 * @param [side] {number} Cube side length.
 	 */
 	this.createCube = function( side )
 	{
+		if( !side || side < 0 )
+			side = 1.0;
+
 		var s = side/2.0;
 
 		_points = [];								// Start afresh.
@@ -130,10 +133,13 @@ function Geometry()
 
 	/**
 	 * Create a unit sphere centered at the origin.
-	 * @param n {number} Number of recursion levels to approximate the sphere.
+	 * @param [n] {number} Number of recursion levels to approximate the sphere.
 	 */
 	this.createSphere = function( n )
 	{
+		if( !n || n < 1 )
+			n = 6;
+
 		_points = [];								// Start afresh.
 		_normals = [];
 

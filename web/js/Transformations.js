@@ -10,6 +10,11 @@ var Tf = {
 	 */
 
 	/**
+	 * Vector with four elements.
+	 * @typedef {number[]} Vec4
+	 */
+
+	/**
 	 * A 4x4 matrix.
 	 * @typedef {Array.<number[]>} Mat44
 	 */
