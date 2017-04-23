@@ -47,7 +47,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	const _GEOM_TYPE = { CUBE: 0, SPHERE: 1, CYLINDER: 2, PRISM: 3 };
 	const _ELEMENTS_PER_VERTEX = 3;
 
-	var _renderingProgram = null;		// Shading program.
+	var /** @type {WebGLProgram} */ _renderingProgram = null;		// Shading program.
 
 	/**
 	 * @type {?GeometryBuffer}
@@ -62,7 +62,17 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	///////////////////////////////////////////// Init the rendering process ///////////////////////////////////////////
 
 	_compileShaders();		// Compile and create the rendering program.
-	gl.enable( gl.PROGRAM_POINT_SIZE );
+
+	//gl.enable( gl.PROGRAM_POINT_SIZE );
+
+	// Culling faces.
+	gl.cullFace( gl.BACK );
+	gl.frontFace( gl.CCW );
+	gl.enable( gl.CULL_FACE );
+
+	// Enable depth test.
+	gl.enable( gl.DEPTH_TEST );
+	gl.depthFunc( gl.LEQUAL );
 
 	////////////////////////////////////////////// Private member functions/////////////////////////////////////////////
 
@@ -158,10 +168,11 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 
 		if( !g )							// No data yet loaded into the buffer?
 		{
+			g = {};
 			g.bufferID = gl.createBuffer();
 			gl.bindBuffer( gl.ARRAY_BUFFER, g.bufferID );
 
-			var /** @type {?Geometry} */ geom = null;
+			var /** @type {?Geometry} */ geom = new Geometry();
 			switch( t )						// Create a geometry vertices and normals according to requested type.
 			{
 				case _GEOM_TYPE.CUBE:     geom.createCube();     break;
@@ -210,6 +221,10 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		// Draw triangles.
 		gl.drawArrays( gl.TRIANGLES, 0, g.vertexCount );
 
+		// Disable attribute arrays for position and normals.
+		gl.disableVertexAttribArray( position_location );
+		gl.disableVertexAttribArray( normal_location );
+
 		if( _material.ambient[3] < 1.0 )
 			gl.disable( gl.BLEND );
 	}
@@ -220,12 +235,16 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	 * @param Camera {@const Mat44} The 4x4 camera matrix.
 	 * @param Model {@const Mat44} The 4x4 model transformation matrix.
 	 * @param vertices {@const Array.<Vec3>} A vector of vertices.
+	 * @returns {number} The position attribute location in shader, so that the pointer can be disabled later.
 	 * @private
 	 */
 	function _setSequenceInformation( Projection, Camera, Model, vertices )
 	{
 		if( !_path )		// We haven't used this buffer before? Create it.
+		{
+			_path = {};
 			_path.bufferID = gl.createBuffer();
+		}
 
 		gl.bindBuffer( gl.ARRAY_BUFFER, _path.bufferID );				// Make this geom bufferID the active buffer.
 
@@ -258,6 +277,8 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		gl.uniform1i( usePhong_location, 0 );							// We don't want to use the Phong shading model.
 
 		_sendShadingInformation( Projection, Camera, Model );
+
+		return position_location;
 	}
 
 	/**
@@ -272,8 +293,8 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		var ModelView = numeric.dot( Camera, Model );		// Model-view transformation matrix.
 
 		// Send the ModelView and Projection matrices.
-		var mvLocation = gl.getUniformLocation( shaderProgram, "ModelView" );
-		var projLocation = gl.getUniformLocation( shaderProgram, "Projection" );
+		var mvLocation = gl.getUniformLocation( _renderingProgram, "ModelView" );
+		var projLocation = gl.getUniformLocation( _renderingProgram, "Projection" );
 
 		gl.uniformMatrix4fv( mvLocation, false, Tf.toWebGLMatrix( ModelView ) );
 		gl.uniformMatrix4fv( projLocation, false, Tf.toWebGLMatrix( Projection ));
@@ -331,7 +352,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	 * A convenient vector-version of setColor(r,g,b,a).
 	 * @param rgba {Vec4} The RGBA vector.
 	 */
-	this.setColor = function( rgba ){
+	this.setColorV = function( rgba ){
 		this.setColor( rgba[0], rgba[1], rgba[2], rgba[3] );
 	};
 
@@ -401,10 +422,13 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 			gl.blendFunc( gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA );
 		}
 
-		_setSequenceInformation( Projection, Camera, Model, vertices );		// Prepare drawing by sending shading information to shaders.
+		var posL =_setSequenceInformation( Projection, Camera, Model, vertices );		// Prepare drawing by sending shading information to shaders.
 
 		// Draw connected lines.
 		gl.drawArrays( gl.LINE_STRIP, 0, _path.vertexCount );
+
+		// Disable vertex attribute array position we sent in the _setSequenceInformation function.
+		gl.disableVertexAttribArray( posL );
 
 		if( _material.ambient[3] < 1.0 )		// Restore blending if necessary.
 			gl.disable( gl.BLEND );
@@ -428,7 +452,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 			gl.blendFunc( gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA );
 		}
 
-		_setSequenceInformation( Projection, Camera, Model, vertices );		// Prepare drawing by sedding shading information to shaders.
+		var posL = _setSequenceInformation( Projection, Camera, Model, vertices );		// Prepare drawing by sedding shading information to shaders.
 
 		// Specify the point size in vertex shader.
 		var pointSize_location = gl.getUniformLocation( _renderingProgram, "pointSize" );
@@ -440,9 +464,20 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 
 		gl.drawArrays( gl.POINTS, 0, _path.vertexCount );
 
+		// Disable vertex attribute array position we sent in the _setSequenceInformation function.
+		gl.disableVertexAttribArray( posL );
+
 		if( _material.ambient[3] < 1.0 )		// Restore blending mode.
 			gl.disable( gl.BLEND );
-	}
+	};
+
+	/**
+	 * Public access to rendering program.
+	 * @returns {WebGLProgram}
+	 */
+	this.getRenderingProgram = function(){
+		return _renderingProgram;
+	};
 }
 
 

@@ -10,6 +10,8 @@
     <script src="js/jquery-3.1.1.min.js"></script>
 	<script src="js/numeric-1.2.6.min.js"></script>
 	<script src="js/Transformations.js"></script>
+	<script src="js/Geometry.js"></script>
+	<script src="js/WebGL.js"></script>
 
     <!-- Vertex shader -->
     <script id="shader-vs" type="x-shader/x-vertex"><%@include file="shaders/vertex.glsl" %></script>
@@ -20,8 +22,7 @@
     <script>
 		var /** type {context} */ gl;
 		var /** type {Element} */ canvas;
-		var shaderProgram;
-		var triangleVertexBuffer;
+		var /** type {WebGL} */ webGL;
 
 		// Time control.
 		var gTime = 0.0;
@@ -152,178 +153,41 @@
         }
 
         /**
-         * Load and compile a shader from a script element.
-         * @param id DOM element's id.
-         */
-        function loadShaderFromDOM( id )
-        {
-            var shaderScript = document.getElementById( id );
-
-            // If we don't find an element with the specified id, it doesn't exist.
-            if( !shaderScript )
-                return null;
-
-            // Loop through the children for the found DOM element and build up the shader source code as a string.
-            var shaderSource  = "";
-            var currentChild = shaderScript.firstChild;
-            while( currentChild )
-            {
-                if( currentChild.nodeType == 3 )        // A text node.
-                    shaderSource += currentChild.textContent;
-                currentChild = currentChild.nextSibling;
-            }
-
-            var /** type {?WebGLShader} */ shader = null;
-            switch( shaderScript.type )
-            {
-                case "x-shader/x-fragment":
-                {
-                    shader = gl.createShader( gl.FRAGMENT_SHADER );
-                    break;
-                }
-                case "x-shader/x-vertex":
-                {
-                    shader = gl.createShader( gl.VERTEX_SHADER );
-                    break;
-                }
-                default:
-                    return null;
-            }
-
-            gl.shaderSource( shader, shaderSource );        // Attach source code to shader object.
-            gl.compileShader( shader );                     // And compile it.
-
-            if( !gl.getShaderParameter( shader, gl.COMPILE_STATUS ) )
-            {
-                alert( "Error compiling shader " + gl.getShaderInfoLog( shader ) );
-                gl.deleteShader( shader );
-                return null;
-            }
-            return shader;
-        }
-
-        /**
-         * Load, compile, and link vertex and fragment shaders.
-         */
-        function setupShaders()
-        {
-            var vertexShader = loadShaderFromDOM( "shader-vs" );                // Get shaders and compile them.
-            var fragmentShader = loadShaderFromDOM( "shader-fs" );
-
-            shaderProgram = gl.createProgram();
-            gl.attachShader( shaderProgram, vertexShader );                     // Link shaders to program.
-            gl.attachShader( shaderProgram, fragmentShader );
-            gl.linkProgram( shaderProgram );
-
-            if( !gl.getProgramParameter( shaderProgram, gl.LINK_STATUS ) )
-                alert( "Failed to set up shaders!" );
-
-            shaderProgram.vertexPositionAttribute = gl.getAttribLocation( shaderProgram, "aVertexPosition" );
-            shaderProgram.vertexColorAttribute = gl.getAttribLocation( shaderProgram, "aVertexColor" );
-        }
-
-        /**
-         * Load vertex and fragment data in buffers.
-         */
-        function setupBuffers()
-        {
-            triangleVertexBuffer = gl.createBuffer();
-            gl.bindBuffer( gl.ARRAY_BUFFER, triangleVertexBuffer );
-
-            var triangleVertices = [
-                //( x     y     z )   (  r    g    b    a )
-                   0.0,  0.5,  0.0,     255,   0,   0, 255,     // v0
-                  -0.5, -0.5,  0.0,       0, 255,   0, 255,     // v1
-                   0.5, -0.5,  0.0,       0,   0, 255, 255      // v2
-            ];
-
-            var nbrOfVertices = 3;
-
-            // Calculate how many bytes that are needed for one vertex element that consists of (x,y,z) + (r,g,b,a).
-            var vertexSizeInBytes = 3 * Float32Array.BYTES_PER_ELEMENT + 4 * Uint8Array.BYTES_PER_ELEMENT;
-            var vertexSizeInFloats = vertexSizeInBytes / Float32Array.BYTES_PER_ELEMENT;
-
-            // Allocate the buffer.
-            var buffer = new ArrayBuffer( nbrOfVertices * vertexSizeInBytes );
-
-            // Map the buffer to a Float32Array view to access position.
-            var positionView = new Float32Array( buffer );
-
-            // Map the same buffer to Uint8Array view to access color.
-            var colorView = new Uint8Array( buffer );
-
-            // Populate the array buffer using the JavaScript array.
-            var positionOffsetInFloats = 0;
-            var colorOffsetInBytes = 12;
-            var k  = 0;
-            for( var i = 0; i < nbrOfVertices; i++ )
-            {
-                positionView[positionOffsetInFloats]   = triangleVertices[k];       // x
-                positionView[positionOffsetInFloats+1] = triangleVertices[k+1];     // y
-                positionView[positionOffsetInFloats+2] = triangleVertices[k+2];     // z
-                colorView[colorOffsetInBytes]          = triangleVertices[k+3];     // r
-                colorView[colorOffsetInBytes+1]        = triangleVertices[k+4];     // g
-                colorView[colorOffsetInBytes+2]        = triangleVertices[k+5];     // b
-                colorView[colorOffsetInBytes+3]        = triangleVertices[k+6];     // a
-
-                k += 7;
-                positionOffsetInFloats += vertexSizeInFloats;
-                colorOffsetInBytes += vertexSizeInBytes;
-            }
-
-            gl.bufferData( gl.ARRAY_BUFFER, buffer, gl.STATIC_DRAW );
-            triangleVertexBuffer.positionLength = 3;
-            triangleVertexBuffer.colorLength = 4;
-            triangleVertexBuffer.numberOfItems = 3;
-        }
-
-        function sendShadingInformation( Projection, Camera, Model )
-		{
-			var ModelView = numeric.dot( Camera, Model );		// Model-view transformation matrix.
-
-			// Send the ModelView and Projection matrices.
-			var mvLocation = gl.getUniformLocation( shaderProgram, "ModelView" );
-			var projLocation = gl.getUniformLocation( shaderProgram, "Projection" );
-
-			gl.uniformMatrix4fv( mvLocation, false, Tf.toWebGLMatrix( ModelView ) );
-			gl.uniformMatrix4fv( projLocation, false, Tf.toWebGLMatrix( Projection ));
-		}
-
-        /**
          * Draw objects.
          */
         function draw()
         {
             gl.viewport( 0, 0, gl.viewportWidth, gl.viewportHeight );
-			gl.clearColor( 0.0, 0.0, 0.0, 1.0 );
+			gl.clearColor( 0.15, 0.15, 0.17, 1.0 );
             gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
 
-			// Set up the view matrix.
+			//////////////////////////////////////////////////////////////////////////////
+
 			Camera = Tf.lookAt( gEye, gPointOfInterest, gUp );
-
-            // Bind the buffer containing both position and color.
-            gl.bindBuffer( gl.ARRAY_BUFFER, triangleVertexBuffer );
-
-            // Describe how positions are organized in vertex array.
-            gl.vertexAttribPointer( shaderProgram.vertexPositionAttribute, triangleVertexBuffer.positionLength, gl.FLOAT, false, 16, 0 );
-
-            // Describe how colors are organized in vertex array.
-            gl.vertexAttribPointer( shaderProgram.vertexColorAttribute, triangleVertexBuffer.colorLength, gl.UNSIGNED_BYTE, true, 16, 12 );
-
-            // Enable vertex attrib arryas for both position and color attributes.
-            gl.enableVertexAttribArray( shaderProgram.vertexPositionAttribute );
-            gl.enableVertexAttribArray( shaderProgram.vertexColorAttribute );
-
-			// Apply transformations.
 			Model = numeric.dot( ArcBall, Tf.scaleU( gZoom ) );
-			sendShadingInformation( Proj, Camera, Model );
+			gl.useProgram( webGL.getRenderingProgram() );
 
-            // Draw triangle.
-            gl.drawArrays( gl.TRIANGLES, 0, triangleVertexBuffer.numberOfItems );
+			/////////////////////////////// Rendering spot ///////////////////////////////
 
-			// After this, disable vertex attrib array for both position and color.
-			gl.disableVertexAttribArray( shaderProgram.vertexPositionAttribute );
-			gl.disableVertexAttribArray( shaderProgram.vertexColorAttribute );
+            webGL.setColor( 1.0, 0.0, 0.0 );			// A red cube.
+			webGL.drawCube( Proj, Camera, Model );
+
+			webGL.setColor( 0.0, 1.0, 0.0 );			// A green sphere.
+			webGL.drawSphere( Proj, Camera, numeric.dot( numeric.dot(Model, Tf.translate(2,0,0)), Tf.scaleU(0.5) ) );
+
+			webGL.setColor( 0.0, 0.0, 1.0 );			// A blue cylinder.
+			webGL.drawCylinder( Proj, Camera, numeric.dot( numeric.dot(Model, Tf.translate(-2,0,-0.5)), Tf.scale(0.5,0.5,1.0) ) );
+
+			var theta = 2.0*Math.PI/6;
+			var r = 3;
+			var /** @type {Vec3} */ points = [];		// A yellow hexagon.
+			for( var i = 0; i <= 6; i++ )
+				points.push( [r*Math.cos( i*theta ), r*Math.sin( i*theta ), 0] );
+			webGL.setColorV( [1.0, 1.0, 0.0] );
+			webGL.drawPath( Proj, Camera, Model, points );
+
+			webGL.setColor( 0.0, 1.0, 1.0, 0.5 );		// A semi-transparent cyan set of points.
+			webGL.drawPoints( Proj, Camera, Model, points.slice(0,-1) );
 
 			// Time control.
 			gTime += gDeltaT;
@@ -358,19 +222,13 @@
 			document.onmouseup = documentMouseUp;
 			$("#resetViewButton").click( resetViewButtonClick );
 
+			// Build prerspective projection.
 			var ratio = canvas.width/canvas.height;
 			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
 
+			// Create the WebGL context and object.
 			gl = createGLContext( canvas );
-            setupShaders();
-            setupBuffers();
-
-			// Enable depth test.
-			gl.enable( gl.DEPTH_TEST );
-			gl.depthFunc( gl.LESS );
-
-			// Use compiled shader program.
-			gl.useProgram( shaderProgram );
+            webGL = new WebGL( gl, "shader-vs", "shader-fs" );
 
 			// Run animation.
 			tick();
