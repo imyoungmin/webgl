@@ -20,6 +20,11 @@ var Tf = {
 	 */
 
 	/**
+	 * A 3x3 matrix.
+	 * @typedef {Array.<number[]>} Mat33
+	 */
+
+	/**
 	 * Translation with individual displacements.
 	 * @param x {number} Displacement along x axis.
 	 * @param y {number} Displacement along y axis.
@@ -223,7 +228,7 @@ var Tf = {
 
 	/**
 	 * Transform a common matrix into a column-major array of doubles, suitable for WebGL shaders.
-	 * @param source {Mat44}
+	 * @param source {Mat44|Mat33}
 	 * @returns {Float32Array}
 	 */
 	toWebGLMatrix: function( source ){
@@ -246,6 +251,21 @@ var Tf = {
 	 */
 	degreesToRadians: function( degrees ){
 		return degrees * (2.0*Math.PI)/360.0;
+	},
+
+	/**
+	 * Get the inverse transpose of the upper left 3x3 matrix in the model view matrix.
+	 * @param MV {Mat44} The model view matrix.
+	 * @returns {Mat33} Desired inverse transpose.
+	 */
+	getInvTransModelView: function( MV ){
+		var /** @typedef{Mat33} */ Upper3x3 = [];
+		Upper3x3.push( MV[0].slice(0,3) );			// Extract upper left 3x3 inner matrix.
+		Upper3x3.push( MV[1].slice(0,3) );
+		Upper3x3.push( MV[2].slice(0,3) );
+
+		var InvUpper3x3 = numeric.inv( Upper3x3 );
+		return numeric.transpose( InvUpper3x3 );
 	}
 
 };

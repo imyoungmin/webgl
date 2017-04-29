@@ -21,8 +21,8 @@
 
     <script>
 		var /** type {context} */ gl;
-		var /** type {Element} */ canvas;
 		var /** type {WebGL} */ webGL;
+		var resizeTimeOut = null;
 
 		// Time control.
 		var gTime = 0.0;
@@ -197,11 +197,20 @@
          * Modify the canvas size when window resizes.
          */
         $(window).resize( function(){
-			var jCanvasContainer = $( "#canvasContainer" );
-			canvas.width = jCanvasContainer[0].offsetWidth;
-			canvas.height = jCanvasContainer[0].offsetHeight;
-			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+
+        	clearTimeout( resizeTimeOut );		// Only the last resize event will be considered.
+
+        	// Give some time before resizing.
+        	resizeTimeOut = setTimeout( function(){
+				var jCanvasContainer = $( "#canvasContainer" );
+				var jCanvas = $( "#myGLCanvas" );
+				var canvas = jCanvas[0];
+				canvas.width = jCanvasContainer[0].offsetWidth;
+				canvas.height = jCanvasContainer[0].offsetHeight;
+				createProjectionMatrix( canvas );
+
+				resetViewButtonClick();
+			}, 500 );
         });
 
         /**
@@ -211,7 +220,7 @@
         {
         	var jCanvas = $( "#myGLCanvas" );
 			var jCanvasContainer = $( "#canvasContainer" );
-            canvas = jCanvas[0];                // Access element and set the height and width.
+            var canvas = jCanvas[0];                // Access element and set the height and width.
 			canvas.width = jCanvasContainer[0].offsetWidth;
             canvas.height = jCanvasContainer[0].offsetHeight;
 
@@ -223,8 +232,7 @@
 			$("#resetViewButton").click( resetViewButtonClick );
 
 			// Build prerspective projection.
-			var ratio = canvas.width/canvas.height;
-			Proj = Tf.perspective( 5*Math.PI/9, ratio, 0.01, 1000.0 );
+			createProjectionMatrix( canvas );
 
 			// Create the WebGL context and object.
 			gl = createGLContext( canvas );
@@ -241,6 +249,16 @@
 		{
 			requestAnimationFrame( tick );
 			draw();
+		}
+
+		/**
+		 * Create the projection matrix according to canvas metrics.
+		 * @param canvas {Element} The canvas element.
+		 */
+		function createProjectionMatrix( canvas )
+		{
+			var ratio = canvas.width/canvas.height;
+			Proj = Tf.perspective( Math.PI/3.0, ratio, 0.01, 100.0 );
 		}
     </script>
 

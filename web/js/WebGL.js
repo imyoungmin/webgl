@@ -213,10 +213,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		var offset = Float32Array.BYTES_PER_ELEMENT * g.vertexCount * _ELEMENTS_PER_VERTEX;
 		gl.vertexAttribPointer( normal_location, _ELEMENTS_PER_VERTEX, gl.FLOAT, false, 0, offset );
 
-		var usePhong_location = gl.getUniformLocation( _renderingProgram, "usePhong" );
-		gl.uniform1i( usePhong_location, 1 );										// We want to use the Phong shading model.
-
-		_sendShadingInformation( Projection, Camera, Model );
+		_sendShadingInformation( Projection, Camera, Model, true );
 
 		// Draw triangles.
 		gl.drawArrays( gl.TRIANGLES, 0, g.vertexCount );
@@ -272,11 +269,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		gl.enableVertexAttribArray( position_location );
 		gl.vertexAttribPointer( position_location, _ELEMENTS_PER_VERTEX, gl.FLOAT, false, 0, 0 );
 
-		// For sequence of points or a path, we don't use the Phong shading model -- simple rendering.
-		var usePhong_location = gl.getUniformLocation( _renderingProgram, "usePhong" );
-		gl.uniform1i( usePhong_location, 0 );							// We don't want to use the Phong shading model.
-
-		_sendShadingInformation( Projection, Camera, Model );
+		_sendShadingInformation( Projection, Camera, Model, false );	// Without using phong model.
 
 		return position_location;
 	}
@@ -286,11 +279,12 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	 * @param Projection {Mat44} The projection matrix.
 	 * @param Camera {Mat44} The camera matrix.
 	 * @param Model {Mat44} The model matrix.
+	 * @param [usingPhong] {boolean} If given and true, compute the inverse transpose of MV to transform normals.
 	 * @private
 	 */
-	function _sendShadingInformation( Projection, Camera, Model )
+	function _sendShadingInformation( Projection, Camera, Model, usingPhong )
 	{
-		var ModelView = numeric.dot( Camera, Model );		// Model-view transformation matrix.
+		var ModelView = numeric.dot( Camera, Model );			// Model-view transformation matrix.
 
 		// Send the ModelView and Projection matrices.
 		var mvLocation = gl.getUniformLocation( _renderingProgram, "ModelView" );
@@ -299,7 +293,18 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		gl.uniformMatrix4fv( mvLocation, false, Tf.toWebGLMatrix( ModelView ) );
 		gl.uniformMatrix4fv( projLocation, false, Tf.toWebGLMatrix( Projection ));
 
-		// Specify if we are drawing a point.
+		if( !!usingPhong )
+		{
+			var InvTransMV = Tf.getInvTransModelView( ModelView );	// The inverse transpose of the upper left 3x3 matrix in the Model View matrix.
+			var itmvLocation = gl.getUniformLocation( _renderingProgram, "InvTransModelView" );
+			gl.uniformMatrix3fv( itmvLocation, false, Tf.toWebGLMatrix( InvTransMV ) );
+		}
+
+		// Specify if we will use phong lighting model.
+		var usePhong_location = gl.getUniformLocation( _renderingProgram, "usePhong" );
+		gl.uniform1i( usePhong_location, Number( !!usingPhong ) );
+
+		// Specify if we are not drawing a point by default.
 		var drawPoint_location = gl.getUniformLocation( _renderingProgram, "drawPoint" );
 		gl.uniform1i( drawPoint_location, 0 );
 
@@ -458,7 +463,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 		var pointSize_location = gl.getUniformLocation( _renderingProgram, "pointSize" );
 		gl.uniform1f( pointSize_location, size );							// Desirable size for points.
 
-		// Specify if we are drawing a point (a flag).
+		// Specify if we are drawing a point (a flag) -- setSequenceInformation sent a 0, but this will override that for a 1.
 		var drawPoint_location = gl.getUniformLocation( _renderingProgram, "drawPoint" );
 		gl.uniform1i( drawPoint_location, 1 );
 
