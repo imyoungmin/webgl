@@ -2,6 +2,7 @@ attribute vec3 position;
 attribute vec3 normal;
 
 uniform mat4 ModelView;
+uniform mat3 InvTransModelView;
 uniform mat4 Projection;
 uniform vec4 lightPosition;
 uniform float pointSize;
@@ -20,7 +21,7 @@ void main(void)
 
 	if( usePhong )
 	{
-		N = (ModelView * n).xyz;
+		N = InvTransModelView * normal;
 		L = (lightPosition - ModelView*p).xyz;
 		E = -(ModelView * p).xyz;
 	}

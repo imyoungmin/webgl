@@ -1,3 +1,5 @@
+"use strict";
+
 /**
  * Class to implement WebGL rendering capabilities.
  * @param gl {WebGLRenderingContext} A WebGL valid context.
@@ -41,7 +43,7 @@ function WebGL( gl, _vertexShaderId, _fragmentShaderId )
 	/**
 	 * @typedef {object} GeometryBuffer
 	 * @property {WebGLBuffer} bufferID - Buffer ID as given by WebGL.
-	 * @property {number} vertexCount - Number of vertieces stored in buffer.
+	 * @property {number} vertexCount - Number of vertices stored in buffer.
  	 */
 
 	const _GEOM_TYPE = { CUBE: 0, SPHERE: 1, CYLINDER: 2, PRISM: 3 };

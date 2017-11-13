@@ -179,7 +179,7 @@ var Tf = {
 	 * @returns {Mat44} A 4x4 perspective matrix.
  	 */
 	frustrum: function( left, right, bottom, top, near, far ){
-		if( right == left || top == bottom || near == far || near < 0.0 || far < 0.0 )
+		if( right == left || top == bottom || near == far || near < 0.0 || far < near )
 			return numeric.identity( 4 );
 
 		return [
