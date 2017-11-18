@@ -282,7 +282,7 @@
 			jCanvas.on( "mousedown", canvasMouseDown );
 			jCanvas.on( "mousemove", canvasMouseMove );
 			jCanvas.on( "contextmenu", function(){ return false; } );
-			jCanvas[0].addEventListener( "mousewheel", canvasMouseScroll, false );
+			jCanvas[0].addEventListener( "wheel", canvasMouseScroll, false );
 			$( document ).on( "mouseup", documentMouseUp );
 			$("#resetViewButton").click( resetViewButtonClick );
 
